@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Morpheus — Video Call Test</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3e;
+    --accent: #6c63ff;
+    --accent-h: #5a52d5;
+    --red: #ef4444;
+    --green: #22c55e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 12px;
+  }
+
+  body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ─── Screens ─────────────────────────────────────────────── */
+  .screen { display: none; }
+  .screen.active { display: flex; }
+
+  /* ─── Login Screen ─────────────────────────────────────────── */
+  #loginScreen {
+    align-items: center; justify-content: center; min-height: 100vh;
+    background: radial-gradient(ellipse at 20% 50%, #1a1d4e 0%, var(--bg) 60%);
+  }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 40px; width: 380px; box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  }
+  .logo { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .logo span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+  input[type=text], input[type=password], input[type=email] {
+    width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 16px;
+    transition: border-color .2s;
+  }
+  input:focus { border-color: var(--accent); }
+  .btn {
+    width: 100%; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600; transition: background .2s, transform .1s; letter-spacing: .02em;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-h); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .err { color: #f87171; font-size: 12px; margin-top: 10px; text-align: center; min-height: 18px; }
+
+  /* ─── Join Screen ──────────────────────────────────────────── */
+  #joinScreen {
+    align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; gap: 16px;
+    background: radial-gradient(ellipse at 80% 50%, #1a1d4e 0%, var(--bg) 60%);
+  }
+  .join-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 36px; width: 380px;
+  }
+  .join-card h2 { margin-bottom: 20px; font-size: 20px; }
+  .join-card .welcome { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .tag { display: inline-block; background: var(--accent); color: #fff; border-radius: 6px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin-left: 6px; text-transform: uppercase; }
+
+  /* ─── Call Screen ──────────────────────────────────────────── */
+  #callScreen {
+    flex-direction: column; height: 100vh; background: #0a0c12;
+  }
+
+  /* header */
+  .call-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    background: rgba(15,17,23,.8); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); z-index: 10;
+  }
+  .call-title { font-size: 15px; font-weight: 600; }
+  #statusBadge {
+    font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 999px;
+    background: var(--surface); color: var(--muted); letter-spacing: .05em; text-transform: uppercase;
+  }
+  #statusBadge.waiting { background: #fef08a22; color: #fef08a; }
+  #statusBadge.connected { background: #22c55e22; color: #22c55e; }
+  #statusBadge.ended { background: #ef444422; color: #ef4444; }
+  #timer { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* videos */
+  .video-grid {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 12px; position: relative; overflow: hidden;
+  }
+  .video-tile {
+    background: var(--surface); border-radius: var(--radius);
+    position: relative; overflow: hidden; min-height: 240px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .video-tile video {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .tile-label {
+    position: absolute; bottom: 10px; left: 12px;
+    background: rgba(0,0,0,.6); backdrop-filter: blur(6px);
+    padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .mute-icon { font-size: 12px; }
+  .avatar {
+    width: 72px; height: 72px; border-radius: 50%; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700;
+  }
+  .no-video-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--surface); flex-direction: column; gap: 8px;
+  }
+  .no-video-overlay.hidden { display: none; }
+  .no-video-label { font-size: 12px; color: var(--muted); }
+
+  /* controls */
+  .call-controls {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 20px 24px;
+    background: rgba(15,17,23,.9); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+  }
+  .ctrl-btn {
+    width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--border);
+    background: var(--surface); color: var(--text); cursor: pointer; font-size: 20px;
+    transition: all .2s; display: flex; align-items: center; justify-content: center;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); transform: scale(1.05); }
+  .ctrl-btn.off { background: #1e1e1e; color: var(--muted); border-color: #2a2a2a; }
+  .ctrl-btn.end { width: 62px; height: 62px; background: var(--red); border-color: var(--red); font-size: 22px; }
+  .ctrl-btn.end:hover { background: #c53030; transform: scale(1.08); }
+
+  /* ended overlay */
+  .ended-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    align-items: center; justify-content: center; z-index: 100; flex-direction: column; gap: 12px;
+  }
+  .ended-overlay.show { display: flex; }
+  .ended-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    padding: 40px; text-align: center; max-width: 340px;
+  }
+  .ended-icon { font-size: 48px; margin-bottom: 12px; }
+  .ended-card h2 { font-size: 22px; margin-bottom: 8px; }
+  .ended-meta { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN ═══════════════════ -->
+<section id="loginScreen" class="screen active">
+  <div class="login-card">
+    <div class="logo">Morpheus <span>●</span></div>
+    <p class="subtitle">Video Call Test Page</p>
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="you@example.com" />
+    <label>Password</label>
+    <input type="password" id="loginPassword" placeholder="••••••••" />
+    <button class="btn btn-primary" onclick="login()">Sign In</button>
+    <p class="err" id="loginErr"></p>
+  </div>
+</section>
+
+<!-- ═══════════════════ JOIN ═══════════════════ -->
+<section id="joinScreen" class="screen">
+  <div class="join-card">
+    <p class="welcome" id="welcomeMsg">Welcome</p>
+    <h2>Join a Call</h2>
+    <label>Session ID</label>
+    <input type="text" id="sessionIdInput" placeholder="paste session UUID here" />
+    <button class="btn btn-primary" onclick="joinCall()">Join Call</button>
+    <p class="err" id="joinErr"></p>
+  </div>
+</section>
+
+<!-- ═══════════════════ CALL ═══════════════════ -->
+<section id="callScreen" class="screen">
+  <!-- Header -->
+  <div class="call-header">
+    <div>
+      <div class="call-title" id="callTitle">Tutoring Session</div>
+    </div>
+    <span id="statusBadge" class="waiting">Waiting for peer…</span>
+    <span id="timer">00:00</span>
+  </div>
+
+  <!-- Videos -->
+  <div class="video-grid">
+    <div class="video-tile" id="localTile">
+      <video id="localVideo" autoplay muted playsinline></video>
+      <div class="no-video-overlay hidden" id="localNoVideo">
+        <div class="avatar" id="localAvatar">Y</div>
+        <span class="no-video-label">Camera off</span>
+      </div>
+      <div class="tile-label">
+        <span id="localMuteIcon" class="mute-icon"></span>
+        You
+      </div>
+    </div>
+
+    <div class="video-tile" id="remoteTile">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <div class="no-video-overlay" id="remoteNoVideo">
+        <div class="avatar" id="remoteAvatar">?</div>
+        <span class="no-video-label" id="remoteNoVideoLabel">Waiting for peer…</span>
+      </div>
+      <div class="tile-label">
+        <span id="remoteMuteIcon" class="mute-icon"></span>
+        <span id="remoteName">Peer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="call-controls">
+    <button class="ctrl-btn" id="muteBtn" onclick="toggleMute()" title="Mute">🎤</button>
+    <button class="ctrl-btn" id="videoBtn" onclick="toggleVideo()" title="Camera">📷</button>
+    <button class="ctrl-btn end" onclick="endCall()" title="End call">📵</button>
+  </div>
+</section>
+
+<!-- ═══════════════════ ENDED OVERLAY ═══════════════════ -->
+<div class="ended-overlay" id="endedOverlay">
+  <div class="ended-card">
+    <div class="ended-icon">📞</div>
+    <h2>Call Ended</h2>
+    <p class="ended-meta" id="endedMeta">Duration: —</p>
+    <button class="btn btn-primary" onclick="reset()">Back to Join</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const API = window.location.origin;
+let accessToken = null;
+let socket = null;
+let pc = null;              // RTCPeerConnection
+let localStream = null;
+let sessionId = null;
+let myRole = null;
+let myName = null;
+let callStartTime = null;
+let timerInterval = null;
+let isMuted = false;
+let isCameraOff = false;
+
+// ICE servers: public Google STUN (works for same-network & most NAT setups)
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+};
+
+// ─── Screen helpers ──────────────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─── Login ───────────────────────────────────────────────────────────────────
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  document.getElementById('loginErr').textContent = '';
+
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Login failed');
+
+    accessToken = data.accessToken;
+    myRole = data.user.role;
+    myName = data.user.name;
+
+    document.getElementById('welcomeMsg').textContent =
+      `Signed in as ${myName} · ${myRole.charAt(0).toUpperCase() + myRole.slice(1)}`;
+    document.getElementById('localAvatar').textContent = myName.charAt(0).toUpperCase();
+
+    setupSocket();
+    show('joinScreen');
+  } catch (err) {
+    document.getElementById('loginErr').textContent = err.message;
+  }
+}
+
+// ─── Socket setup ────────────────────────────────────────────────────────────
+function setupSocket() {
+  socket = io(API, { auth: { token: accessToken } });
+
+  socket.on('connect', () => console.log('Socket connected:', socket.id));
+  socket.on('error', ({ message }) => { console.error('Socket error:', message); alert('Socket: ' + message); });
+
+  // ── WebRTC Signaling events ──────────────────────────────────────────────
+  socket.on('call_peer_joined', async ({ role }) => {
+    console.log('Peer joined, role:', role);
+    document.getElementById('remoteName').textContent = role === 'tutor' ? 'Tutor' : 'Student';
+    document.getElementById('remoteNoVideoLabel').textContent = 'Peer connected…';
+    // Tutor creates the offer (initiator)
+    if (myRole === 'tutor') {
+      await createOffer();
+    }
+  });
+
+  socket.on('webrtc_offer', async ({ offer }) => {
+    console.log('Received offer');
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('webrtc_answer', { sessionId, answer });
+  });
+
+  socket.on('webrtc_answer', async ({ answer }) => {
+    console.log('Received answer');
+    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  });
+
+  socket.on('webrtc_ice_candidate', async ({ candidate }) => {
+    try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); }
+    catch (e) { console.warn('ICE candidate error:', e); }
+  });
+
+  socket.on('peer_call_event', ({ role, eventType }) => {
+    console.log('Peer event:', eventType, 'by', role);
+    if (eventType === 'muted') document.getElementById('remoteMuteIcon').textContent = '🔇';
+    if (eventType === 'unmuted') document.getElementById('remoteMuteIcon').textContent = '';
+    if (eventType === 'video_off') {
+      document.getElementById('remoteNoVideo').classList.remove('hidden');
+      document.getElementById('remoteNoVideoLabel').textContent = 'Camera off';
+    }
+    if (eventType === 'video_on') {
+      document.getElementById('remoteNoVideo').classList.add('hidden');
+    }
+    if (eventType === 'left') {
+      document.getElementById('remoteNoVideoLabel').textContent = 'Peer disconnected';
+      document.getElementById('remoteNoVideo').classList.remove('hidden');
+    }
+  });
+
+  socket.on('call_ended', ({ endedAt }) => {
+    showEnded(endedAt);
+  });
+}
+
+// ─── Join Call ───────────────────────────────────────────────────────────────
+async function joinCall() {
+  sessionId = document.getElementById('sessionIdInput').value.trim();
+  document.getElementById('joinErr').textContent = '';
+  if (!sessionId) { document.getElementById('joinErr').textContent = 'Enter a session ID'; return; }
+
+  try {
+    // Fetch session info
+    const res = await fetch(`${API}/api/sessions/${sessionId}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const sessionData = await res.json();
+    if (!res.ok) throw new Error(sessionData.message || 'Session not found');
+
+    document.getElementById('callTitle').textContent = sessionData.topic || 'Tutoring Session';
+
+    // Get user media
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('localVideo').srcObject = localStream;
+    document.getElementById('localNoVideo').classList.add('hidden');
+
+    // Build PeerConnection
+    pc = new RTCPeerConnection(ICE_CONFIG);
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+    pc.ontrack = ({ streams: [stream] }) => {
+      document.getElementById('remoteVideo').srcObject = stream;
+      document.getElementById('remoteNoVideo').classList.add('hidden');
+    };
+
+    pc.onicecandidate = ({ candidate }) => {
+      if (candidate) socket.emit('webrtc_ice_candidate', { sessionId, candidate });
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log('ICE state:', pc.connectionState);
+      if (pc.connectionState === 'connected') {
+        setStatus('connected');
+        startTimer();
+      }
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        setStatus('ended');
+      }
+    };
+
+    // Join the call room
+    socket.emit('join_call', { sessionId });
+
+    show('callScreen');
+    setStatus('waiting');
+  } catch (err) {
+    document.getElementById('joinErr').textContent = err.message;
+  }
+}
+
+async function createOffer() {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  socket.emit('webrtc_offer', { sessionId, offer });
+}
+
+// ─── Controls ─────────────────────────────────────────────────────────────────
+function toggleMute() {
+  isMuted = !isMuted;
+  localStream.getAudioTracks().forEach(t => { t.enabled = !isMuted; });
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? '🔇' : '🎤';
+  btn.classList.toggle('off', isMuted);
+  document.getElementById('localMuteIcon').textContent = isMuted ? '🔇' : '';
+  socket.emit('call_event', { sessionId, eventType: isMuted ? 'muted' : 'unmuted' });
+}
+
+function toggleVideo() {
+  isCameraOff = !isCameraOff;
+  localStream.getVideoTracks().forEach(t => { t.enabled = !isCameraOff; });
+  const btn = document.getElementById('videoBtn');
+  btn.textContent = isCameraOff ? '🚫' : '📷';
+  btn.classList.toggle('off', isCameraOff);
+  document.getElementById('localNoVideo').classList.toggle('hidden', !isCameraOff);
+  socket.emit('call_event', { sessionId, eventType: isCameraOff ? 'video_off' : 'video_on' });
+}
+
+function endCall() {
+  socket.emit('end_call', { sessionId });
+  showEnded(new Date());
+}
+
+// ─── Status & Timer ───────────────────────────────────────────────────────────
+function setStatus(s) {
+  const el = document.getElementById('statusBadge');
+  el.className = s;
+  const labels = { waiting: 'Waiting for peer…', connected: 'Connected', ended: 'Call ended' };
+  el.textContent = labels[s] || s;
+}
+
+function startTimer() {
+  callStartTime = Date.now();
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - callStartTime) / 1000);
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    document.getElementById('timer').textContent = `${mm}:${ss}`;
+  }, 1000);
+}
+
+function showEnded(endedAt) {
+  clearInterval(timerInterval);
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  if (pc) pc.close();
+
+  const duration = callStartTime
+    ? Math.floor((new Date(endedAt) - callStartTime) / 1000)
+    : 0;
+  const mm = String(Math.floor(duration / 60)).padStart(2, '0');
+  const ss = String(duration % 60).padStart(2, '0');
+  document.getElementById('endedMeta').textContent = `Duration: ${mm}:${ss}`;
+  document.getElementById('endedOverlay').classList.add('show');
+  setStatus('ended');
+}
+
+function reset() {
+  document.getElementById('endedOverlay').classList.remove('show');
+  document.getElementById('sessionIdInput').value = '';
+  isMuted = false; isCameraOff = false; callStartTime = null;
+  document.getElementById('muteBtn').textContent = '🎤';
+  document.getElementById('videoBtn').textContent = '📷';
+  document.getElementById('muteBtn').classList.remove('off');
+  document.getElementById('videoBtn').classList.remove('off');
+  document.getElementById('timer').textContent = '00:00';
+  show('joinScreen');
+}
+</script>
+</body>
+</html>
