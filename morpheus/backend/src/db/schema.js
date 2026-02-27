@@ -388,6 +388,51 @@ export const messages = pgTable("messages", {
   editedAt: timestamp("edited_at"),
 });
 
+// ─── AI Chat System ───────────────────────────────────────────────────────────
+export const aiChatRoleEnum = pgEnum("ai_chat_role", ["user", "model"]);
+
+export const aiChatSessions = pgTable("ai_chat_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+
+  title: varchar("title", { length: 255 }).default("New Conversation"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const aiChatMessages = pgTable("ai_chat_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  sessionId: uuid("session_id")
+    .references(() => aiChatSessions.id, { onDelete: "cascade" })
+    .notNull(),
+
+  role: aiChatRoleEnum("role").notNull(),
+  content: text("content").notNull(),
+  imageUrl: text("image_url"), // Optional attached image
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Community Chat ───────────────────────────────────────────────────────────
+export const communityMessages = pgTable("community_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  senderId: uuid("sender_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+
+  content: text("content").notNull(),
+
+  isFlagged: boolean("is_flagged").default(false), // True if flagged maliciously
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 
 // ─── Auth: Email Verification OTPs ───────────────────────────────────────────
 export const emailVerificationOtps = pgTable(

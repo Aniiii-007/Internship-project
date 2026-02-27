@@ -310,3 +310,61 @@ Rooms for calls are namespaced as `call:<sessionId>`.
 | `call_peer_joined` | Server ➡ Client | `{ userId, role }` | Notifies that the other participant joined |
 | `peer_call_event` | Server ➡ Client | `{ role, eventType }` | Notifies UI to show mute/camera off icons |
 | `call_ended` | Server ➡ Client | `{ endedAt }` | Force both clients to leave the call interface |
+
+
+## 12. AI Chatbot (OCR Integration)
+
+These routes handle persistent 1:1 chat sessions with the Morpheus AI tutor. It supports answering text queries or processing image uploads using Tesseract OCR.
+
+### `POST /api/chatbot/session`
+Initiates a new AI chat session.
+- **Auth:** Bearer Token
+- **Payload:** `{ "title": "Math Homework Questions" }` (Optional)
+- **Response:** Returns the newly created `aiChatSession` object.
+
+### `GET /api/chatbot`
+Fetches all AI chat sessions for the authenticated user.
+- **Auth:** Bearer Token
+- **Response:** Returns an array of `aiChatSession` objects ordered by `updatedAt`.
+
+### `GET /api/chatbot/:sessionId`
+Fetches the complete message history for a specific AI chat session.
+- **Auth:** Bearer Token (must own the session)
+- **Response:** Returns an array of `aiChatMessage` objects belonging to the session.
+
+### `POST /api/chatbot/:sessionId/ask`
+Asks a question in a specific AI session. Can include an image which will be processed via OCR and uploaded to ImageKit.
+- **Auth:** Bearer Token (must own the session)
+- **FormData body:** 
+  - `question`: string (optional, usually provided if no image is sent, or sent alongside an image)
+  - `image`: File (optional, processed through Tesseract OCR for text extraction)
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "userMessage": { "id": "...", "role": "user", "content": "Question or OCR text...", "imageUrl": "..." },
+      "systemMessage": { "id": "...", "role": "model", "content": "AI generated step-by-step response..." }
+    }
+  }
+  ```
+
+---
+
+## 13. Community Chat
+
+A real-time, AI-moderated global chat room exclusively for Students to discuss educational topics. 
+
+### WebSocket Events (Namespace: default)
+| Event | Direction | Payload Example | Description |
+|---|---|---|---|
+| `join_community_chat` | Client ➡ Server | `None` | Joins the `community_room` namespace (Students only). |
+| `send_community_message` | Client ➡ Server | `{ content: "How do I solve problem 24?" }` | Sends a message. Scanned by Groq AI. If toxic/NSFW, it is blocked. |
+| `new_community_message`| Server ➡ Client | `{ id, senderId, content, createdAt... }` | Received when a valid message passes AI moderation. |
+| `community_message_rejected` | Server ➡ Client | `{ message: "...", reason: "..." }` | Emitted back to the sender if their message was flagged by the AI. |
+
+### REST API `GET /api/community/history`
+Fetches a paginated history of the most recently approved community messages. Useful for initial load when navigating to the chat page.
+- **Auth:** Bearer Token
+- **Query Params:** `?limit=50`
+- **Response:** Returns an array (chronologically ordered from oldest to newest) of `communityMessages`, populated with sender details (`sender: { id, name }`).

@@ -60,6 +60,52 @@ export function setupSocket(server) {
     io.on('connection', (socket) => {
         console.log(`User connected: ${socket.user.id} (${socket.user.role})`);
 
+        // ─── Community Chat ───────────────────────────────────────────────────
+        socket.on('join_community_chat', () => {
+            if (socket.user.role !== 'student') {
+                return socket.emit('error', { message: 'Only students can join the community chat' });
+            }
+            socket.join('community_room');
+            console.log(`User ${socket.user.id} joined community_room`);
+        });
+
+        socket.on('send_community_message', async ({ content }) => {
+            if (socket.user.role !== 'student') {
+                return socket.emit('error', { message: 'Only students can send community messages' });
+            }
+            if (!content || typeof content !== 'string' || !content.trim()) {
+                return socket.emit('error', { message: 'Message content cannot be empty' });
+            }
+
+            try {
+                // Run AI Moderation
+                const moderation = await moderateCommunityMessage(content);
+
+                if (!moderation.isApproved) {
+                    return socket.emit('community_message_rejected', {
+                        message: 'Your message was flagged by moderation.',
+                        reason: moderation.reason
+                    });
+                }
+
+                // Save to DB
+                const [newMsg] = await db
+                    .insert(communityMessages)
+                    .values({
+                        senderId: socket.user.id,
+                        content: content.trim(),
+                        isFlagged: false
+                    })
+                    .returning();
+
+                // Broadcast
+                io.to('community_room').emit('new_community_message', newMsg);
+            } catch (err) {
+                console.error('[Community Chat Error]:', err);
+                socket.emit('error', { message: 'Failed to send community message' });
+            }
+        });
+
         // ─── join_conversation ────────────────────────────────────────────────
         socket.on('join_conversation', async (conversationId) => {
             try {

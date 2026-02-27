@@ -18,6 +18,9 @@ import connectionRouter from './routes/connection.route.js';
 import reviewRouter from './routes/review.route.js';
 import { getPublicTutorProfile } from './controller/user.controller.js';
 import { setupSocket } from './socket/index.js';
+import chatbotRouter from './routes/chatbot.route.js';
+import communityRouter from './routes/community.route.js';
+
 
 
 const __filename = fileURLToPath(import.meta.url);//These two lines are changed by Aniket wanave These lines are
@@ -53,6 +56,8 @@ app.use('/api/sessions', sessionRouter);
 app.use('/api/subjects', subjectsRouter);
 app.use('/api/connections', connectionRouter);
 app.use('/api/reviews', reviewRouter);
+app.use('/api/chatbot', chatbotRouter);
+app.use('/api/community', communityRouter);
 
 
 app.get('/api/tutors/:tutorId', getPublicTutorProfile);
